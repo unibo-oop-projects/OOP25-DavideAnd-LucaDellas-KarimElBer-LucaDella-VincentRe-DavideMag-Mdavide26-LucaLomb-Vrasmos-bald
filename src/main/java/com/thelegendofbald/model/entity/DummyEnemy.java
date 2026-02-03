@@ -14,21 +14,21 @@ import com.thelegendofbald.view.render.Tile;
 import com.thelegendofbald.view.render.TileMap;
 
 /**
- * Simple enemy that follows the player, reacts to hits, and has a death animation.
+ * Simple enemy that follows the player, reacts to hits, and has a death
+ * animation.
  */
 public final class DummyEnemy extends Entity implements Combatant {
-
 
     private enum EnemyState {
         RUNNING,
         HURT,
         DYING,
-        DEAD 
+        DEAD
     }
 
-    private static final int FRAME_WIDTH = 50;
-    private static final int FRAME_HEIGHT = 50;
-    private static final int RENDER_SIZE = 50;
+    private static final int FRAME_WIDTH = 42;
+    private static final int FRAME_HEIGHT = 42;
+    private static final int RENDER_SIZE = 42;
     private static final int RUN_FRAMES = 9;
     private static final int HURT_FRAMES = 5;
     private static final int DEAD_FRAMES = 7;
@@ -53,15 +53,15 @@ public final class DummyEnemy extends Entity implements Combatant {
     /**
      * Creates an enemy.
      *
-     * @param x           spawn X position
-     * @param y           spawn Y position
-     * @param health      initial health points
-     * @param name        entity name
+     * @param x                     spawn X position
+     * @param y                     spawn Y position
+     * @param health           initial health points
+     * @param name               entity name
      * @param attackPower base attack power
-     * @param tileMap     map for collision handling
+     * @param tileMap         map for collision handling
      */
     public DummyEnemy(final int x, final int y, final int health, final String name,
-                      final int attackPower, final TileMap tileMap) {
+            final int attackPower, final TileMap tileMap) {
         super(x, y, FRAME_WIDTH, FRAME_HEIGHT, name, new LifeComponent(health));
         this.attackPower = attackPower;
         this.tileMap = Objects.requireNonNull(tileMap, "tileMap must not be null");
@@ -215,7 +215,7 @@ public final class DummyEnemy extends Entity implements Combatant {
                 g.drawImage(frame, getX(), getY(), RENDER_SIZE, RENDER_SIZE, null);
             } else {
                 g.drawImage(frame, getX() + RENDER_SIZE, getY(),
-                            -RENDER_SIZE, RENDER_SIZE, null);
+                        -RENDER_SIZE, RENDER_SIZE, null);
             }
         } else {
             g.setColor(Color.RED);
@@ -296,6 +296,7 @@ public final class DummyEnemy extends Entity implements Combatant {
 
     /**
      * Used by GamePanel to know when to remove the body.
+     * 
      * @return true only if the enemy is in the final DEAD state.
      */
     public boolean isRemovable() {
