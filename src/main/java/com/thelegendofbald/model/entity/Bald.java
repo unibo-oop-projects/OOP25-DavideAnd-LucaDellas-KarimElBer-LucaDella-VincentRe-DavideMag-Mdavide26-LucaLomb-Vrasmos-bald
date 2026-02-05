@@ -33,12 +33,12 @@ import com.thelegendofbald.view.render.TileMap;
  */
 public final class Bald extends Entity implements Combatant {
 
-    private static final int FRAME_WIDTH = 50;
-    private static final int FRAME_HEIGHT = 50;
+    private static final int FRAME_WIDTH = 42;
+    private static final int FRAME_HEIGHT = 42;
 
     private static final int HITBOX_WIDTH = 15;
     private static final int HITBOX_HEIGHT = 25;
-    private static final int ENTITY_SIZE = 50;
+    private static final int ENTITY_SIZE = 42;
     private static final int TILE_SIZE = 32;
     private static final int COLLISION_TILE_ID = 2;
 
@@ -52,15 +52,14 @@ public final class Bald extends Entity implements Combatant {
     private static final double SPEED_MULTIPLIER = 50.0;
 
     /** Size used when rendering flipped images. */
-    private static final int RENDER_SIZE = 50;
+    private static final int RENDER_SIZE = 42;
 
     /** Scheduler used for timed effects (e.g., immobilize), avoids raw threads. */
-    private static final ScheduledExecutorService SCHEDULER =
-            Executors.newSingleThreadScheduledExecutor(r -> {
-                final Thread t = new Thread(r, "bald-effects-scheduler");
-                t.setDaemon(true);
-                return t;
-            });
+    private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor(r -> {
+        final Thread t = new Thread(r, "bald-effects-scheduler");
+        t.setDaemon(true);
+        return t;
+    });
 
     private final Wallet wallet = new Wallet(100);
     private final StatusEffectManager buffManager = new StatusEffectManager(this);
@@ -90,10 +89,10 @@ public final class Bald extends Entity implements Combatant {
     /**
      * Creates a Bald instance.
      *
-     * @param x initial x position in pixels
-     * @param y initial y position in pixels
-     * @param maxHealth maximum health points
-     * @param name display name of the character
+     * @param x               initial x position in pixels
+     * @param y               initial y position in pixels
+     * @param maxHealth       maximum health points
+     * @param name            display name of the character
      * @param baseAttackPower base attack power before buffs
      */
     public Bald(final int x, final int y, final int maxHealth, final String name, final int baseAttackPower) {
@@ -102,7 +101,6 @@ public final class Bald extends Entity implements Combatant {
         loadRunFrames();
         loadAllAttackFrames();
     }
-
 
     private void loadRunFrames() {
         runFrames = new BufferedImage[RUN_FRAMES];
@@ -115,7 +113,7 @@ public final class Bald extends Entity implements Combatant {
                     LoggerUtils.error("Run frame not found: " + framePath);
                 }
             } catch (final IOException e) {
-                 LoggerUtils.error("Error loading run frame " + framePath + ": " + e.getMessage());
+                LoggerUtils.error("Error loading run frame " + framePath + ": " + e.getMessage());
             }
         }
     }
@@ -149,6 +147,7 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Sets the current tile map used for collisions and spawn computations.
+     * 
      * @param map the tile map to use
      */
     public void setTileMap(final TileMap map) {
@@ -157,8 +156,9 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Places Bald centered on the spawn tile; feet rest on ground.
+     * 
      * @param spawnTileId the spawn tile identifier to search
-     * @param tileSize the tile size in pixels
+     * @param tileSize    the tile size in pixels
      */
     public void setSpawnPosition(final int spawnTileId, final int tileSize) {
         if (tileMap == null) {
@@ -180,7 +180,6 @@ public final class Bald extends Entity implements Combatant {
         }
     }
 
-
     /**
      * @return the current attack power after buffs are applied
      */
@@ -191,6 +190,7 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Sets the base (unbuffed) attack power.
+     * 
      * @param value new base attack power
      */
     public void setAttackPower(final int value) {
@@ -199,6 +199,7 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Applies a status effect/buff to the player.
+     * 
      * @param buff the effect to apply
      */
     public void applyBuff(final StatusEffect buff) {
@@ -214,6 +215,7 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Inflicts damage to the player, reducing health.
+     * 
      * @param damage the amount of damage to apply
      */
     @Override
@@ -240,6 +242,7 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Shoots a projectile from the player.
+     * 
      * @throws UnsupportedOperationException until implemented
      */
     public void shootProjectile() {
@@ -250,9 +253,8 @@ public final class Bald extends Entity implements Combatant {
      * Starts the attack animation based on the current weapon.
      */
     public void startAttackAnimation() {
-        weapon.ifPresent(w ->
-                actualAttackFrames = attackFrames.getOrDefault(
-                        w.getName().toLowerCase(Locale.ROOT), attackFrames.get("def")));
+        weapon.ifPresent(w -> actualAttackFrames = attackFrames.getOrDefault(
+                w.getName().toLowerCase(Locale.ROOT), attackFrames.get("def")));
         currentAttackFrame = 0;
     }
 
@@ -279,6 +281,7 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Renders the player sprite (run/attack) or a fallback rectangle.
+     * 
      * @param g the graphics context
      */
     public void render(final Graphics g) {
@@ -315,6 +318,7 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Sets horizontal speed; also updates facing direction.
+     * 
      * @param value horizontal speed in px/s (sign gives direction)
      */
     public void setSpeedX(final double value) {
@@ -328,6 +332,7 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Sets vertical speed.
+     * 
      * @param value vertical speed in px/s
      */
     public void setSpeedY(final double value) {
@@ -344,6 +349,7 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Sets the current facing direction.
+     * 
      * @param value true if facing right, false if facing left
      */
     @Override
@@ -353,6 +359,7 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Temporarily prevents movement for the given duration.
+     * 
      * @param durationMillis immobilization duration in milliseconds
      */
     public void immobilize(final long durationMillis) {
@@ -398,8 +405,7 @@ public final class Bald extends Entity implements Combatant {
         final int topX = Math.max(0, nextHitboxX.y / TILE_SIZE);
         final int bottomX = Math.max(0, (nextHitboxX.y + nextHitboxX.height - 1) / TILE_SIZE);
 
-        outerX:
-        for (int tx = leftX; tx <= rightX; tx++) {
+        outerX: for (int tx = leftX; tx <= rightX; tx++) {
             for (int ty = topX; ty <= bottomX; ty++) {
                 final Tile tile = map.getTileAt(tx, ty);
                 if (tile != null && tile.getId() == COLLISION_TILE_ID) {
@@ -420,8 +426,7 @@ public final class Bald extends Entity implements Combatant {
         final int topY = Math.max(0, nextHitboxY.y / TILE_SIZE);
         final int bottomY = Math.max(0, (nextHitboxY.y + nextHitboxY.height - 1) / TILE_SIZE);
 
-        outerY:
-        for (int tx = leftY; tx <= rightY; tx++) {
+        outerY: for (int tx = leftY; tx <= rightY; tx++) {
             for (int ty = topY; ty <= bottomY; ty++) {
                 final Tile tile = map.getTileAt(tx, ty);
                 if (tile != null && tile.getId() == COLLISION_TILE_ID) {
@@ -465,6 +470,7 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Adds coins to the player's wallet.
+     * 
      * @param amount number of coins to add
      */
     public void addCoins(final int amount) {
@@ -487,6 +493,7 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Sets/equips the current weapon.
+     * 
      * @param wpn the weapon to equip (nullable)
      */
     public void setWeapon(final Weapon wpn) {
@@ -509,12 +516,14 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Sets precise X position and syncs integer render X.
+     * 
      * @param value new X position in pixels
      */
     public void setPosX(final double value) {
         this.posX = value;
         setX((int) Math.round(value));
     }
+
     /**
      * @return precise Y position in world coordinates (pixels)
      */
@@ -524,6 +533,7 @@ public final class Bald extends Entity implements Combatant {
 
     /**
      * Sets precise Y position and syncs integer render Y.
+     * 
      * @param value new Y position in pixels
      */
     public void setPosY(final double value) {

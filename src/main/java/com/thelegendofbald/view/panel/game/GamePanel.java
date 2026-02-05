@@ -12,7 +12,6 @@ import java.awt.Insets;
 import java.awt.geom.Arc2D;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -51,8 +50,6 @@ import com.thelegendofbald.view.panel.hud.LifePanel;
 import com.thelegendofbald.view.panel.inventory.InventoryPanel;
 import com.thelegendofbald.view.panel.shop.ShopPanel;
 import com.thelegendofbald.view.render.GridPanel;
-import com.thelegendofbald.view.render.Tile;
-import com.thelegendofbald.view.render.TileMap;
 import com.thelegendofbald.view.window.GameWindow;
 
 /**
@@ -81,8 +78,6 @@ public final class GamePanel extends MenuPanel implements Game {
     private static final int BALD_W = 60;
     /** Height of the Bald character. */
     private static final int BALD_H = 60;
-
-    private static final int ID_SHOP = 6;
 
     /** Percentage of insets for the options panel width. */
     private static final double OPTIONS_WIDTH_INSETS = 0.25;
@@ -158,13 +153,13 @@ public final class GamePanel extends MenuPanel implements Game {
         this.inventory = ((InventoryPanel) this.inventoryPanel).getInventory();
         this.inventory.setBald(bald);
 
-        final TileMap tileMap = new TileMap(size.width, size.height, TILE_SIZE);
-        final List<DummyEnemy> enemies = new ArrayList<>();
+        this.levelManager = new LevelManager(size.width, size.height, TILE_SIZE);
+        final List<DummyEnemy> enemies = levelManager.getEnemies();
+
         this.combatManager = new CombatManager(bald, enemies);
         this.bald.setWeapon(new Sword(0, 0, WEAPON_ICON, WEAPON_ICON, combatManager));
 
-        this.levelManager = new LevelManager(tileMap, bald, combatManager, enemies);
-        this.levelManager.loadInitialMap();
+        this.levelManager.loadInitialMap(bald);
 
         shopButton.setText("Shop");
         shopButton.setBackground(Color.YELLOW);
@@ -351,16 +346,15 @@ public final class GamePanel extends MenuPanel implements Game {
         super.paintComponent(g2d);
         scaleGraphics(g2d);
 
-        levelManager.getTileMap().paint(g2d);
+        // Refactored rendering
+        levelManager.renderMap(g2d);
         gridPanel.paintComponent(g2d);
-        levelManager.getItemManager().renderAll(g2d);
+        levelManager.renderItems(g2d);
 
         bald.render(g2d);
-        levelManager.getEnemies().forEach(enemy -> enemy.render(g2d));
 
-        if (levelManager.getBoss() != null && levelManager.getBoss().isAlive()) {
-            levelManager.getBoss().render(g2d);
-        }
+        levelManager.renderEnemies(g2d);
+        levelManager.renderBoss(g2d);
 
         combatManager.getProjectiles().forEach(p -> p.render(g2d));
 
@@ -450,7 +444,7 @@ public final class GamePanel extends MenuPanel implements Game {
      * @param g2d graphics context
      */
     private void drawBossHP(final Graphics2D g2d) {
-        if (levelManager.getBoss() == null || !levelManager.getBoss().isAlive()) {
+        if (!levelManager.isBossAlive()) {
             return;
         }
 
@@ -458,8 +452,8 @@ public final class GamePanel extends MenuPanel implements Game {
         final int x = (getWidth() - w) / 2;
         final int y = 12;
 
-        final int hp = levelManager.getBoss().getHealth();
-        final int max = levelManager.getBoss().getMaxHealth();
+        final int hp = levelManager.getBossHealth();
+        final int max = levelManager.getBossMaxHealth();
         final double ratio = Math.max(0.0, Math.min(1.0, hp / (double) max));
         final int fill = (int) (w * ratio);
 
@@ -606,23 +600,9 @@ public final class GamePanel extends MenuPanel implements Game {
         JOptionPane.showMessageDialog(this, shopPanel, "SHOP", JOptionPane.PLAIN_MESSAGE);
     }
 
-    /** Shows the shop button when Bald is over a {@link #ID_SHOP} tile. */
+    /** Shows the shop button when Bald is over a Shop tile. */
     public void checkIfNearShopTile() {
-        final int tileSize = levelManager.getTileMap().getTileSize();
-
-        final int baldX = bald.getX();
-        final int baldY = bald.getY();
-        final int baldW = bald.getWidth();
-        final int baldH = bald.getHeight();
-
-        final int feetY = baldY + baldH;
-        final int feetYInside = Math.max(0, feetY - 1);
-
-        final int tileFeetY = feetYInside / tileSize;
-        final int tileCenterX = (baldX + baldW / 2) / tileSize;
-
-        final Tile tileUnderFeet = levelManager.getTileMap().getTileAt(tileCenterX, tileFeetY);
-        final boolean onShopTile = tileUnderFeet != null && tileUnderFeet.getId() == ID_SHOP;
+        final boolean onShopTile = levelManager.isNearShop(bald);
 
         if (shopButton.isVisible() != onShopTile) {
             shopButton.setVisible(onShopTile);
