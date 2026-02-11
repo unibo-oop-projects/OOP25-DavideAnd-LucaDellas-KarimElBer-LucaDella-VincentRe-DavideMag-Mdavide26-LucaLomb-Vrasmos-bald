@@ -7,12 +7,9 @@ import javax.swing.SwingUtilities;
 import com.thelegendofbald.controller.input.InputController;
 import com.thelegendofbald.controller.level.LevelManager;
 import com.thelegendofbald.model.entity.Bald;
-import com.thelegendofbald.model.entity.DummyEnemy;
 import com.thelegendofbald.model.system.CombatManager;
 import com.thelegendofbald.model.system.Timer;
 import com.thelegendofbald.view.panel.game.GamePanel;
-
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
  * Manages the main game loop, updates, and game state.
@@ -26,8 +23,6 @@ public final class GameEngine implements Runnable {
     private static final long LATE_FRAME_BACKOFF_NANOS = 250_000L;
     private static final int DEFAULT_MAX_FPS = 60;
     private static final long PORTAL_COOLDOWN_MS = 2000;
-    private static final int ID_NEXT_MAP_TRIGGER = 10;
-    private static final int ID_PREV_PORTAL = 8;
 
     private final GamePanel gamePanel;
     private final Bald bald;
@@ -56,10 +51,7 @@ public final class GameEngine implements Runnable {
      * @param inputController the input controller.
      * @param timer           the game timer.
      */
-    @SuppressFBWarnings(
-        value = "EI2",
-        justification = "GameEngine orchestrates these specific instances."
-    )
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "EI2", justification = "GameEngine")
     public GameEngine(final GamePanel gamePanel, final Bald bald, final LevelManager levelManager,
             final CombatManager combatManager, final InputController inputController, final Timer timer) {
         this.gamePanel = gamePanel;
@@ -203,48 +195,46 @@ public final class GameEngine implements Runnable {
         }
         inputController.handleInput();
         bald.updateAnimation();
-        bald.move(levelManager.getTileMap(), deltaTime);
+
+        // Use moved logic
+        levelManager.moveEntity(bald, deltaTime);
         bald.updateBuffs();
 
         if (System.currentTimeMillis() >= portalCooldownUntil) {
-             if (levelManager.isBaldTouchingTile(ID_NEXT_MAP_TRIGGER)) {
-                 levelManager.switchToNextMap();
-                 portalCooldownUntil = System.currentTimeMillis() + PORTAL_COOLDOWN_MS;
-                 return;
-             }
-             if (levelManager.isBaldTouchingTile(ID_PREV_PORTAL)) {
-                 levelManager.switchToPreviousMap();
-                 portalCooldownUntil = System.currentTimeMillis() + PORTAL_COOLDOWN_MS;
-                 return;
-             }
+            if (levelManager.isTouchingNextMapTrigger(bald)) {
+                levelManager.switchToNextMap(bald, combatManager);
+                portalCooldownUntil = System.currentTimeMillis() + PORTAL_COOLDOWN_MS;
+                return;
+            }
+            if (levelManager.isTouchingPrevMapPortal(bald)) {
+                levelManager.switchToPreviousMap(bald, combatManager);
+                portalCooldownUntil = System.currentTimeMillis() + PORTAL_COOLDOWN_MS;
+                return;
+            }
         }
 
         combatManager.checkEnemyAttacks();
-        levelManager.getEnemies().removeIf(DummyEnemy::isRemovable);
-        levelManager.getEnemies().forEach(enemy -> {
-            if (enemy.isCloseTo(bald)) {
-                enemy.followPlayer(bald);
-                enemy.updateAnimation();
-            }
-        });
 
-        if (levelManager.getBoss() != null && levelManager.getBoss().isAlive()) {
-            levelManager.getBoss().followPlayer(bald);
-            levelManager.getBoss().updateAnimation();
-        }
-        combatManager.getProjectiles().forEach(p -> p.move(levelManager.getTileMap()));
+        // Use moved logic for enemies, boss, items, projectiles
+        levelManager.updateEnemies(bald);
+        levelManager.updateBoss(bald);
+        levelManager.moveProjectiles(combatManager.getProjectiles());
         combatManager.checkProjectiles();
-
-        levelManager.getItemManager().updateAll();
-        levelManager.getItemManager().handleItemCollection(bald);
+        levelManager.updateItems(bald);
 
         SwingUtilities.invokeLater(gamePanel::checkIfNearShopTile);
 
         if (!bald.isAlive() && !gameOver) {
             handleGameOver();
         }
-        if (levelManager.getBoss() != null && !levelManager.getBoss().isAlive()
-                && !gameWon && !gameOver) {
+        if (!levelManager.isBossAlive()
+                && !gameWon && !gameOver && "map_4".equals(levelManager.getCurrentMapName())) {
+            handleGameBossWinCondition();
+        }
+    }
+
+    private void handleGameBossWinCondition() {
+        if (levelManager.getBossMaxHealth() > 0 && !levelManager.isBossAlive() && !gameWon && !gameOver) {
             handleGameWon();
         }
     }
@@ -273,6 +263,6 @@ public final class GameEngine implements Runnable {
         this.paused = false;
         inputController.clearPressedKeys();
 
-        levelManager.reset();
+        levelManager.reset(bald, combatManager);
     }
 }

@@ -13,7 +13,7 @@ import javax.swing.KeyStroke;
 
 import com.thelegendofbald.model.config.ControlsSettings;
 import com.thelegendofbald.model.entity.Bald;
-import com.thelegendofbald.model.item.Interactable;
+
 import com.thelegendofbald.model.system.CombatManager;
 import com.thelegendofbald.controller.level.LevelManager;
 
@@ -46,10 +46,7 @@ public class InputController {
      * @param toggleOptions   runnable to toggle options menu.
      * @param toggleInventory runnable to toggle inventory.
      */
-    @SuppressFBWarnings(
-        value = "EI2",
-        justification = "InputController controls these specific instances."
-    )
+    @SuppressFBWarnings(value = "EI2", justification = "InputController controls these specific instances.")
     public InputController(final JComponent component, final Bald bald, final CombatManager combatManager,
             final LevelManager levelManager, final Runnable toggleOptions, final Runnable toggleInventory) {
         this.bald = bald;
@@ -76,7 +73,6 @@ public class InputController {
         im.clear();
         am.clear();
 
-
         bindKey(im, am, "pressed UP", ControlsSettings.UP.getKey(), true,
                 () -> pressedKeys.add(ControlsSettings.UP.getKey()));
         bindKey(im, am, "pressed DOWN", ControlsSettings.DOWN.getKey(), true,
@@ -92,7 +88,6 @@ public class InputController {
                 toggleInventory);
         bindKey(im, am, "interact", ControlsSettings.INTERACT.getKey(), true,
                 this::interactWithItems);
-
 
         bindKey(im, am, "released UP", ControlsSettings.UP.getKey(), false,
                 () -> pressedKeys.remove(ControlsSettings.UP.getKey()));
@@ -159,12 +154,7 @@ public class InputController {
     }
 
     private void interactWithItems() {
-        levelManager.getItemManager().getItems().stream()
-                .filter(item -> bald.getBounds().intersects(item.getBounds()))
-                .filter(item -> item instanceof Interactable)
-                .map(item -> (Interactable) item)
-                .findFirst()
-                .ifPresent(Interactable::interact);
+        levelManager.tryInteract(bald);
     }
 
     /**

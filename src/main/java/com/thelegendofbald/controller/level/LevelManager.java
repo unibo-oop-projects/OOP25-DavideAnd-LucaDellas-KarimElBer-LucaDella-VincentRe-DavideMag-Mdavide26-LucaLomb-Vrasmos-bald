@@ -1,9 +1,13 @@
 package com.thelegendofbald.controller.level;
 
+import java.awt.Graphics2D;
 import java.awt.Point;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
+import com.thelegendofbald.combat.Projectile;
 
 import com.thelegendofbald.model.entity.Bald;
 import com.thelegendofbald.model.entity.DummyEnemy;
@@ -15,12 +19,12 @@ import com.thelegendofbald.model.item.loot.LootGenerator;
 import com.thelegendofbald.model.item.map.MapItemLoader;
 import com.thelegendofbald.model.system.CombatManager;
 import com.thelegendofbald.utils.LoggerUtils;
+import com.thelegendofbald.view.render.Tile;
 import com.thelegendofbald.view.render.TileMap;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-
 /**
- * Manages the game levels, including map transitions, entity spawning, and item management.
+ * Manages the game levels, including map transitions, entity spawning, and item
+ * management.
  */
 public class LevelManager {
 
@@ -31,8 +35,11 @@ public class LevelManager {
 
     private static final int ID_PORTAL = 4;
     private static final int ID_SPAWN = 5;
+    private static final int ID_SHOP = 6;
     private static final int ID_ENEMY = 7;
+    private static final int ID_PREV_PORTAL = 8;
     private static final int ID_BOSS = 9;
+    private static final int ID_NEXT_MAP_TRIGGER = 10;
 
     private static final int ENEMY_W = 60;
     private static final int ENEMY_H = 60;
@@ -44,8 +51,6 @@ public class LevelManager {
     private final TileMap tileMap;
     private final ItemManager itemManager;
     private final LootGenerator lootGenerator;
-    private final Bald bald;
-    private final CombatManager combatManager;
     private final List<DummyEnemy> enemies;
 
     private String currentMapName = MAP_1;
@@ -67,22 +72,13 @@ public class LevelManager {
     /**
      * Constructs a new LevelManager.
      *
-     * @param tileMap       the tile map used for the game levels.
-     * @param bald          the player character.
-     * @param combatManager the combat manager.
-     * @param enemies       the list of enemies.
+     * @param width    the map width.
+     * @param height   the map height.
+     * @param tileSize the tile size.
      */
-    @SuppressFBWarnings(
-        value = "EI2",
-        justification = "The LevelManager needs to modify the actual instances of these objects."
-    )
-    public LevelManager(final TileMap tileMap, final Bald bald, final CombatManager combatManager,
-            final List<DummyEnemy> enemies) {
-        this.tileMap = tileMap;
-        this.bald = bald;
-        this.combatManager = combatManager;
-        this.enemies = enemies;
-
+    public LevelManager(final int width, final int height, final int tileSize) {
+        this.tileMap = new TileMap(width, height, tileSize);
+        this.enemies = new java.util.LinkedList<>();
 
         final int healthPotion = 7;
         final int strengthPotion = 8;
@@ -95,8 +91,10 @@ public class LevelManager {
 
     /**
      * Loads the initial map and spawns the player.
+     *
+     * @param bald the player character.
      */
-    public void loadInitialMap() {
+    public void loadInitialMap(final Bald bald) {
         itemManager.loadItemsForMap(MAP_1);
         tileMap.changeMap(MAP_1);
         bald.setTileMap(tileMap);
@@ -112,14 +110,17 @@ public class LevelManager {
 
     /**
      * Switches to the next map in the sequence.
+     *
+     * @param bald          the player.
+     * @param combatManager the combat manager.
      */
-    public void switchToNextMap() {
+    public void switchToNextMap(final Bald bald, final CombatManager combatManager) {
         final String nextMapName = mapTransitions.get(currentMapName);
         if (nextMapName != null) {
             pendingEntryTileId = ID_SPAWN;
             pendingEntryIndex = 0;
             setFacingForTransition(currentMapName, nextMapName);
-            changeAndLoadMap(nextMapName);
+            changeAndLoadMap(nextMapName, bald, combatManager);
         } else {
             LoggerUtils.error("No next map defined.");
         }
@@ -127,20 +128,23 @@ public class LevelManager {
 
     /**
      * Switches to the previous map in the sequence.
+     *
+     * @param bald          the player.
+     * @param combatManager the combat manager.
      */
-    public void switchToPreviousMap() {
+    public void switchToPreviousMap(final Bald bald, final CombatManager combatManager) {
         final String prevMapName = reverseTransitions.get(currentMapName);
         if (prevMapName != null) {
             pendingEntryTileId = ID_PORTAL;
             pendingEntryIndex = 0;
             setFacingForTransition(currentMapName, prevMapName);
-            changeAndLoadMap(prevMapName);
+            changeAndLoadMap(prevMapName, bald, combatManager);
         } else {
             LoggerUtils.error("No previous map defined.");
         }
     }
 
-    private void changeAndLoadMap(final String mapName) {
+    private void changeAndLoadMap(final String mapName, final Bald bald, final CombatManager combatManager) {
         boss = null;
         currentMapName = mapName;
 
@@ -189,8 +193,6 @@ public class LevelManager {
 
         spawnActorsFromMap();
         itemManager.loadItemsForMap(mapName);
-
-
         combatManager.setBoss(boss);
     }
 
@@ -248,8 +250,11 @@ public class LevelManager {
 
     /**
      * Resets the level manager to its initial state.
+     *
+     * @param bald          the player.
+     * @param combatManager the combat manager.
      */
-    public void reset() {
+    public void reset(final Bald bald, final CombatManager combatManager) {
         currentMapName = MAP_1;
         tileMap.changeMap(MAP_1);
         itemManager.loadItemsForMap(MAP_1);
@@ -261,29 +266,106 @@ public class LevelManager {
     }
 
     /**
-     * Returns the item manager.
+     * Updates enemy logic and removes dead enemies.
      *
-     * @return the item manager.
+     * @param bald the player to interact with.
      */
-    @SuppressFBWarnings(
-        value = "EI",
-        justification = "The ItemManager is intended to be accessed and modified externally."
-    )
-    public ItemManager getItemManager() {
-        return itemManager;
+    public void updateEnemies(final Bald bald) {
+        enemies.removeIf(DummyEnemy::isRemovable);
+        enemies.forEach(enemy -> {
+            if (enemy.isCloseTo(bald)) {
+                enemy.followPlayer(bald);
+                enemy.updateAnimation();
+            }
+        });
     }
 
     /**
-     * Returns the final boss instance.
+     * Updates boss logic.
      *
-     * @return the final boss, or null if not spawned.
+     * @param bald the player to interact with.
      */
-    @SuppressFBWarnings(
-        value = "EI",
-        justification = "The Boss instance needs to be accessed directly."
-    )
-    public FinalBoss getBoss() {
-        return boss;
+    public void updateBoss(final Bald bald) {
+        if (boss != null && boss.isAlive()) {
+            boss.followPlayer(bald);
+            boss.updateAnimation();
+        }
+    }
+
+    /**
+     * Updates item manager logic.
+     *
+     * @param bald the player collecting items.
+     */
+    public void updateItems(final Bald bald) {
+        itemManager.updateAll();
+        itemManager.handleItemCollection(bald);
+    }
+
+    /**
+     * Moves the specified entity taking tile collisions into account.
+     *
+     * @param entity    the entity to move (e.g. Bald).
+     * @param deltaTime time elapsed since last frame.
+     */
+    public void moveEntity(final Bald entity, final double deltaTime) {
+        entity.move(tileMap, deltaTime);
+    }
+
+    /**
+     * Moves projectiles and checks for collisions with the map.
+     * 
+     * @param projectiles the projectiles to move.
+     */
+    public void moveProjectiles(final List<Projectile> projectiles) {
+        projectiles.forEach(p -> p.move(tileMap));
+    }
+
+    /**
+     * Renders the map background and tiles.
+     * 
+     * @param g2d graphics context.
+     */
+    public void renderMap(final Graphics2D g2d) {
+        tileMap.paint(g2d);
+    }
+
+    /**
+     * Renders the items.
+     * 
+     * @param g2d graphics context.
+     */
+    public void renderItems(final Graphics2D g2d) {
+        itemManager.renderAll(g2d);
+    }
+
+    /**
+     * Renders the enemies.
+     * 
+     * @param g2d graphics context.
+     */
+    public void renderEnemies(final Graphics2D g2d) {
+        enemies.forEach(enemy -> enemy.render(g2d));
+    }
+
+    /**
+     * Renders the boss.
+     * 
+     * @param g2d graphics context.
+     */
+    public void renderBoss(final Graphics2D g2d) {
+        if (boss != null && boss.isAlive()) {
+            boss.render(g2d);
+        }
+    }
+
+    /**
+     * Returns an unmodifiable view of the enemies list.
+     *
+     * @return the enemies list.
+     */
+    public List<DummyEnemy> getEnemies() {
+        return Collections.unmodifiableList(enemies);
     }
 
     /**
@@ -296,38 +378,33 @@ public class LevelManager {
     }
 
     /**
-     * Returns the list of enemies.
-     *
-     * @return the list of enemies.
+     * Checks if the player is touching a specific tile type (next map trigger).
+     * 
+     * @param bald the player.
+     * @return true if touching next map trigger.
      */
-    @SuppressFBWarnings(
-        value = "EI",
-        justification = "The enemies list needs to be accessed and modified directly."
-    )
-    public List<DummyEnemy> getEnemies() {
-        return enemies;
+    public boolean isTouchingNextMapTrigger(final Bald bald) {
+        return isBaldTouchingTile(bald, ID_NEXT_MAP_TRIGGER);
     }
 
     /**
-     * Returns the tile map.
-     *
-     * @return the tile map.
+     * Checks if the player is touching a specific tile type (previous map portal).
+     * 
+     * @param bald the player.
+     * @return true if touching previous map portal.
      */
-    @SuppressFBWarnings(
-        value = "EI",
-        justification = "The TileMap is a heavy object and shared across controllers."
-    )
-    public TileMap getTileMap() {
-        return tileMap;
+    public boolean isTouchingPrevMapPortal(final Bald bald) {
+        return isBaldTouchingTile(bald, ID_PREV_PORTAL);
     }
 
     /**
      * Checks if the player is touching a tile with the specified ID.
      *
+     * @param bald   the player.
      * @param tileId the ID of the tile to check.
      * @return true if touching, false otherwise.
      */
-    public boolean isBaldTouchingTile(final int tileId) {
+    public boolean isBaldTouchingTile(final Bald bald, final int tileId) {
         final int ts = tileMap.getTileSize();
 
         final int x1 = bald.getX();
@@ -377,5 +454,78 @@ public class LevelManager {
         return Optional.ofNullable(tileMap.getTileAt(tx, ty))
                 .map(t -> t.getId() == id)
                 .orElse(false);
+    }
+
+    /**
+     * Checks for shop tile near player.
+     * 
+     * @param bald the player.
+     * @return true if near shop.
+     */
+    public boolean isNearShop(final Bald bald) {
+        final int tileSize = tileMap.getTileSize();
+        final int baldX = bald.getX();
+        final int baldY = bald.getY();
+        final int baldW = bald.getWidth();
+        final int baldH = bald.getHeight();
+
+        final int feetY = baldY + baldH;
+        final int feetYInside = Math.max(0, feetY - 1);
+
+        final int tileFeetY = feetYInside / tileSize;
+        final int tileCenterX = (baldX + baldW / 2) / tileSize;
+
+        final Tile tileUnderFeet = tileMap.getTileAt(tileCenterX, tileFeetY);
+        return tileUnderFeet != null && tileUnderFeet.getId() == ID_SHOP;
+    }
+
+    /**
+     * Checks if the boss is alive.
+     * 
+     * @return true if boss is present and alive.
+     */
+    public boolean isBossAlive() {
+        return boss != null && boss.isAlive();
+    }
+
+    /**
+     * Attempts to interact with nearby items.
+     * 
+     * @param bald the player.
+     */
+    public void tryInteract(final Bald bald) {
+        itemManager.getItems().stream()
+                .filter(item -> bald.getBounds().intersects(item.getBounds()))
+                .filter(item -> item instanceof com.thelegendofbald.model.item.Interactable)
+                .map(item -> (com.thelegendofbald.model.item.Interactable) item)
+                .findFirst()
+                .ifPresent(com.thelegendofbald.model.item.Interactable::interact);
+    }
+
+    /**
+     * Gets the boss health.
+     * 
+     * @return boss health or 0.
+     */
+    public int getBossHealth() {
+        return boss != null ? boss.getHealth() : 0;
+    }
+
+    /**
+     * Gets the boss max health.
+     * 
+     * @return boss max health or 0.
+     */
+    public int getBossMaxHealth() {
+        return boss != null ? boss.getMaxHealth() : 0;
+    }
+
+    /**
+     * Gets the tile size.
+     * 
+     * @return tile size.
+     */
+    public int getTileSize() {
+        return tileMap.getTileSize();
     }
 }
